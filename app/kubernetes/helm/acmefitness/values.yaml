@@ -1,0 +1,36 @@
+# Default values for acmefitness.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+
+service:
+  type: ClusterIP
+  port: 80
+
+image:
+  registry: "a"
+  repositoryPrefix: "b"
+  tag: "c35edfc1f7ea7ffb2a639b1c1b2234af8b6f58b5"
+
+passwords:
+  cartRedis: ""
+  orderMongodb: ""
+  usersMongodb: ""
+  catalogMongodb: ""
+
+ingress:
+  enabled: false
+  certManager: false
+  hosts:
+    - name: domain.example.com
+      tls: true
+      tlsSecret: domain-example-com-tls
+
+resources: {}
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}

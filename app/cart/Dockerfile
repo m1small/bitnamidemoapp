@@ -1,0 +1,20 @@
+FROM bitnami/python:3.7
+MAINTAINER Bill Shetti "billshetti@gmail.com"
+ENV REDIS_HOST="localhost"
+ENV REDIS_PORT="6379"
+ENV REDIS_PASSWORD=""
+
+# needed for redis-cli ; the server is not used
+RUN install_packages redis-server
+
+COPY ./app/cart/requirements.txt /app/requirements.txt
+RUN pip3 install -r requirements.txt
+
+ADD . /app
+COPY /app/cart/entrypoint/docker-entrypoint.sh /usr/local/bin/
+RUN chmod 777 /usr/local/bin/docker-entrypoint.sh
+RUN ln -s /usr/local/bin/docker-entrypoint.sh /app # backwards compat
+
+EXPOSE 80
+EXPOSE 5000
+ENTRYPOINT ["docker-entrypoint.sh"]

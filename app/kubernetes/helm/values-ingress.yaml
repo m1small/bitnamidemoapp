@@ -1,0 +1,8 @@
+ingress:
+  enabled: true
+  certManager: true
+  hosts:
+    - name: acmefitness1.stacksmith-kubeapps-demo-bkpr-eks.nami.run
+      tls: true
+      tlsSecret: acmefitness1-tls
+

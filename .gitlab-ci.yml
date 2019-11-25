@@ -1,0 +1,226 @@
+include:
+  template: Container-Scanning.gitlab-ci.yml
+
+stages:
+  - build
+  - scanning
+  - GovernanceCheck
+  - deploy_staging
+  - PerformanceCheck
+  - deploy_production
+
+  
+build:cart:
+  stage: build
+  image: docker:latest
+  variables:
+    DOCKER_HOST: tcp://docker:2375/
+    DOCKER_DRIVER: overlay2
+  services:
+    - docker:dind
+  before_script:
+    - docker info
+    - docker login registry.gitlab.com -u "$REGISTRY_USER" -p "$REGISTRY_PASSWORD"
+  script:
+    - docker info
+    - docker build --file /builds/vmware-cloud-advocacy/vmworld2019/app/cart/Dockerfile -t gitlab-cart .
+    - docker tag gitlab-cart registry.gitlab.com/vmware-cloud-advocacy/vmworld2019/gitlab-cart:latest
+    - docker push registry.gitlab.com/vmware-cloud-advocacy/vmworld2019/gitlab-cart:latest
+  tags: 
+    - Dedicated
+  only:
+    changes:
+        - app/cart/**/*   
+      
+build:order:
+  stage: build
+  image: docker:latest
+  variables:
+    DOCKER_HOST: tcp://docker:2375/
+    DOCKER_DRIVER: overlay2
+  services:
+    - docker:dind
+  before_script:
+    - docker info
+    - docker login registry.gitlab.com -u "$REGISTRY_USER" -p "$REGISTRY_PASSWORD"
+  script:
+    - docker info
+    - docker build --file /builds/vmware-cloud-advocacy/vmworld2019/app/order/Dockerfile -t gitlab-order .
+    - docker tag gitlab-order registry.gitlab.com/vmware-cloud-advocacy/vmworld2019/gitlab-order:latest
+    - docker push registry.gitlab.com/vmware-cloud-advocacy/vmworld2019/gitlab-order:latest
+  tags: 
+    - Dedicated
+  only:
+    changes:
+        - app/order/**/*
+
+build:front_end:
+  stage: build
+  image: docker:latest
+  variables:
+    DOCKER_HOST: tcp://docker:2375/
+    DOCKER_DRIVER: overlay2
+  services:
+    - docker:dind
+  before_script:
+    - docker info
+    - docker login registry.gitlab.com -u "$REGISTRY_USER" -p "$REGISTRY_PASSWORD"
+  script:
+    - docker info
+    - docker build --file /builds/vmware-cloud-advocacy/vmworld2019/app/front_end/Dockerfile -t gitlab-front_end .
+    - docker tag gitlab-front_end registry.gitlab.com/vmware-cloud-advocacy/vmworld2019/gitlab-front_end:latest
+    - docker push registry.gitlab.com/vmware-cloud-advocacy/vmworld2019/gitlab-front_end:latest
+  tags: 
+    - Dedicated
+  only:
+    changes:
+        - app/front_end/**/*
+    
+build:payment:
+  stage: build
+  image: docker:latest
+  variables:
+    DOCKER_HOST: tcp://docker:2375/
+    DOCKER_DRIVER: overlay2
+  services:
+    - docker:dind
+  before_script:
+    - docker info
+    - docker login registry.gitlab.com -u "$REGISTRY_USER" -p "$REGISTRY_PASSWORD"
+  script:
+    - docker info
+    - docker build --file /builds/vmware-cloud-advocacy/vmworld2019/app/payment/Dockerfile -t gitlab-payment .
+    - docker tag gitlab-payment registry.gitlab.com/vmware-cloud-advocacy/vmworld2019/gitlab-payment:latest
+    - docker push registry.gitlab.com/vmware-cloud-advocacy/vmworld2019/gitlab-payment:latest
+  tags: 
+    - Dedicated
+  only:
+    changes:
+        - app/payment/**/*
+    
+build:catalogsvc:
+  stage: build
+  image: docker:latest
+  variables:
+    DOCKER_HOST: tcp://docker:2375/
+    DOCKER_DRIVER: overlay2
+  services:
+    - docker:dind
+  before_script:
+    - docker info
+    - docker login registry.gitlab.com -u "$REGISTRY_USER" -p "$REGISTRY_PASSWORD"
+  script:
+    - docker info
+    - docker build --file /builds/vmware-cloud-advocacy/vmworld2019/app/catalogsvc/Dockerfile -t gitlab-catalogsvc .
+    - docker tag gitlab-catalogsvc registry.gitlab.com/vmware-cloud-advocacy/vmworld2019/gitlab-catalogsvc:latest
+    - docker push registry.gitlab.com/vmware-cloud-advocacy/vmworld2019/gitlab-catalogsvc:latest
+  tags: 
+    - Dedicated
+  only:
+    changes:
+        - app/catalogsvc/**/*
+    
+build:user:
+  stage: build
+  image: docker:latest
+  variables:
+    DOCKER_HOST: tcp://docker:2375/
+    DOCKER_DRIVER: overlay2
+  services:
+    - docker:dind
+  before_script:
+    - docker info
+    - docker login registry.gitlab.com -u "$REGISTRY_USER" -p "$REGISTRY_PASSWORD"
+  script:
+    - docker info
+    - docker build --file /builds/vmware-cloud-advocacy/vmworld2019/app/user/Dockerfile -t gitlab-user .
+    - docker tag gitlab-user registry.gitlab.com/vmware-cloud-advocacy/vmworld2019/gitlab-user:latest
+    - docker push registry.gitlab.com/vmware-cloud-advocacy/vmworld2019/gitlab-user:latest
+  tags: 
+    - Dedicated
+  only:
+    changes:
+        - app/user/**/*
+        
+container_scanning:
+  stage: scanning
+
+BudgetCheck:
+  stage: GovernanceCheck
+  image: vtimd/alpine-python-kubectl
+  script:
+    - chmod +x gitlab-budget-test_py.py
+    - ./gitlab-budget-test_py.py $BILL_TOKEN
+    - if [ $OVERAGE = "OVER" ]; then exit 1 ; else echo "Within Budget. Continuing!"; fi
+  tags: 
+    - Dedicated
+
+SecurityCheck:
+  stage: GovernanceCheck
+  image: vtimd/alpine-python-kubectl
+  script:
+    - chmod +x vss-findings.py
+    - python3 vss-findings.py
+    - if [ $VSS_VIOLATION_FOUND = "False" ]; then exit 1 ; else echo "Violation Check Passed. Continuing!"; fi
+  tags: 
+    - Dedicated
+
+DeployStaging:
+  stage: deploy_staging
+  environment: 
+    name: eks-staging
+  image:
+    name: bitnami/kubectl
+    entrypoint: [""]
+  script:
+    - kubectl create namespace $GITLAB_USER_LOGIN -o yaml --dry-run | kubectl apply -f -
+    - kubectl apply -n $GITLAB_USER_LOGIN -f /builds/vmware-cloud-advocacy/vmworld2019/app/kubernetes/kubernetes-manifests/
+  tags:
+    - cluster
+    - eks
+    - kubernetes
+    - staging
+    
+WavefrontCheck:
+  stage: PerformanceCheck
+  environment: 
+    name: staging
+  image:
+    name: retgits/wavefront-pod-inspector:latest
+    entrypoint: [""]
+  script:
+    - export GITLAB_TOKEN=$LEON_TOKEN
+    - export API_TOKEN=$WFTOKEN
+    - export CI_PROJECT_NAME=$CI_PROJECT_NAME
+    - echo calling Wavefront to get $METRIC details for pod $POD_NAME
+    - /bin/entrypoint.sh
+    - if [ $abc = "failed" ]; then echo "Alert" && exit 1 ; else echo "Within range. Continuing!"; fi
+  tags: 
+    - Dedicated
+
+TrafficGenerator:
+  stage: PerformanceCheck
+  image: 
+    name: gcr.io/vmwarecloudadvocacy/locust:latest
+  script:
+   - chmod +x /app/traffic_gen.py
+   - python3 /app/traffic_gen.py
+  tags: 
+   - Dedicated
+
+    
+DeployProduction:
+  stage: deploy_production
+  environment: 
+    name: eks-production 
+  image:
+    name: bitnami/kubectl
+    entrypoint: [""]
+  script:
+    - kubectl create namespace $GITLAB_USER_LOGIN -o yaml --dry-run | kubectl apply -f -
+    - kubectl apply -n $GITLAB_USER_LOGIN -f /builds/vmware-cloud-advocacy/vmworld2019/app/kubernetes/kubernetes-manifests/
+  tags:
+    - cluster
+    - eks
+    - kubernetes
+    - production

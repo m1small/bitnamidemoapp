@@ -1,0 +1,16 @@
+{
+  "name": "payment",
+  "version": "1.0.0",
+  "description": "advocacy newApp payment service",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "author": "dillson",
+  "license": "ISC",
+  "dependencies": {
+    "body-parser": "^1.18.3",
+    "express": "^4.16.4",
+    "uuid": "^3.3.2"
+  }
+}
